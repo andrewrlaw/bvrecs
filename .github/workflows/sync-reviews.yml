@@ -1,0 +1,35 @@
+name: Sync Discogs Reviews
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # Daily at 3am UTC
+  workflow_dispatch:        # Allow manual trigger from GitHub Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write       # Needed to commit reviews.json back to repo
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run review sync
+        env:
+          DISCOGS_TOKEN: ${{ secrets.DISCOGS_TOKEN }}
+        run: node fetch-reviews.js
+
+      - name: Commit updated reviews.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reviews.json
+          git diff --staged --quiet || git commit -m "chore: sync reviews [$(date -u +%Y-%m-%d)]"
+          git push
