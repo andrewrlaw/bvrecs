@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record Collection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oi&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Old Standard TT', serif; }
+
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface2: #f5f5f5;
+    --border: #e8e8e8;
+    --text: #111111;
+    --muted: #999999;
+    --accent: #111111;
+    --accent2: #555555;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Old Standard TT', serif;
+    font-size: 120%;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  #search {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    color: var(--text);
+    font-size: 0.85rem;
+    padding: 4px 0;
+    width: 200px;
+    outline: none;
+    transition: border-color 0.2s;
+
+  }
+  #search:focus { border-bottom-color: var(--text); }
+  #search::placeholder { color: var(--muted); }
+
+  #sort {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    color: var(--text);
+    font-size: 0.85rem;
+    padding: 4px 0;
+    outline: none;
+    cursor: pointer;
+
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  #record-count {
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-left: auto;
+    white-space: nowrap;
+    letter-spacing: 0.05em;
+  }
+
+
+  /* GRID */
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0;
+    padding: 0;
+  }
+
+  @media (min-width: 900px) {
+    #grid { grid-template-columns: repeat(5, 1fr); }
+  }
+
+  /* TILE */
+  .tile {
+    aspect-ratio: 1;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tile-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  .tile-front {
+    width: 100%;
+    height: 100%;
+    background: #2e2e2e;
+  }
+
+  .tile-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: filter 0.35s ease;
+  }
+
+  .tile:hover .tile-img {
+    filter: blur(8px) brightness(0.45);
+  }
+
+  .tile-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+  }
+
+  /* INFO OVERLAY */
+  .tile-back {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    text-align: center;
+    gap: 5px;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.62);
+  }
+
+  .tile:hover .tile-back {
+    opacity: 1;
+  }
+
+  .tile-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #fff;
+    letter-spacing: 0.01em;
+  }
+
+  .tile-artist {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.75);
+    line-height: 1.4;
+    letter-spacing: 0.03em;
+  }
+
+  .tile-year {
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.5);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+
+  /* LOADING */
+  #loading {
+    text-align: center;
+    color: var(--muted);
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #empty {
+    display: none;
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
+  /* MODAL */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  #modal-overlay.open { display: flex; }
+
+  #modal {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 4px;
+    max-width: 680px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  #modal-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 1rem;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+    transition: color 0.15s;
+    line-height: 1;
+  }
+  #modal-close:hover { color: #111; }
+
+  #modal-body {
+    display: flex;
+    gap: 28px;
+    padding: 28px;
+  }
+
+  #modal-cover {
+    width: 180px;
+    min-width: 180px;
+    object-fit: cover;
+    align-self: flex-start;
+    background: #f5f5f5;
+  }
+
+  #modal-cover-placeholder {
+    width: 180px;
+    min-width: 180px;
+    height: 180px;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    align-self: flex-start;
+  }
+
+  #modal-details { flex: 1; min-width: 0; }
+
+  #modal-title {
+    font-family: 'Oi', serif;
+    font-size: 2.4rem;
+    font-weight: 400;
+    line-height: 1.0;
+    letter-spacing: 0;
+  }
+
+  #modal-artist {
+    font-family: 'Oi', serif;
+    color: #e8503a;
+    font-size: 2.2rem;
+    line-height: 1.0;
+    margin-bottom: 16px;
+    letter-spacing: 0;
+  }
+
+  .modal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .meta-chip {
+    background: #f5f5f5;
+    border: none;
+    border-radius: 2px;
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    color: #888;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .meta-chip.genre { background: #111; color: #fff; }
+
+  #modal-review {
+    font-size: 1.2rem;
+    color: #333;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: #f9f9f9;
+    border-radius: 4px;
+  }
+
+  #modal-review-label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  #modal-notes {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    border-left: 2px solid var(--border);
+    padding-left: 10px;
+    margin-bottom: 16px;
+  }
+
+  #modal-tracklist details { margin-bottom: 4px; }
+
+  #modal-tracklist summary {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+    margin-bottom: 0;
+    padding: 4px 0;
+  }
+  #modal-tracklist summary::-webkit-details-marker { display: none; }
+
+  #modal-tracklist summary::after {
+    content: '›';
+    font-size: 1rem;
+    transition: transform 0.2s;
+    display: inline-block;
+  }
+  #modal-tracklist details[open] summary::after {
+    transform: rotate(90deg);
+  }
+
+  #modal-tracklist details[open] summary {
+    margin-bottom: 10px;
+  }
+
+  .track-row {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    align-items: baseline;
+  }
+  .track-row:last-child { border-bottom: none; }
+
+  .track-pos {
+    color: var(--muted);
+    min-width: 28px;
+    font-size: 0.75rem;
+  }
+
+  .track-title { flex: 1; }
+
+  .track-duration {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #modal-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 18px;
+    align-items: center;
+  }
+
+  .modal-link {
+    color: #111;
+    font-size: 0.75rem;
+    text-decoration: none;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 2px;
+    letter-spacing: 0.05em;
+    transition: border-color 0.15s;
+    white-space: nowrap;
+  }
+  .modal-link:hover { border-color: #111; }
+
+
+  #modal-loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 500px) {
+    #modal-body { flex-direction: column; }
+    #modal-cover, #modal-cover-placeholder { width: 100%; min-width: unset; height: auto; }
+    #grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  }
+
+  /* Touch devices: show overlay on tap */
+  @media (hover: none) {
+    .tile.tapped .tile-img { filter: blur(6px) brightness(0.6); }
+    .tile.tapped .tile-back { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Record Collection</h1>
+  <input id="search" type="search" placeholder="Search artist or title…" autocomplete="off">
+  <select id="sort">
+    <option value="random">Shuffle</option>
+    <option value="genre">Genre A–Z</option>
+    <option value="artist">Artist A–Z</option>
+    <option value="year_desc">Year (newest)</option>
+    <option value="year_asc">Year (oldest)</option>
+    <option value="title">Title A–Z</option>
+  </select>
+</header>
+
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div id="loading-msg">Loading your collection…</div>
+</div>
+
+<div id="empty">No records match your search.</div>
+
+<div id="grid"></div>
+
+<!-- MODAL -->
+<div id="modal-overlay" role="dialog" aria-modal="true">
+  <div id="modal">
+    <button id="modal-close" aria-label="Close">✕</button>
+    <div id="modal-body">
+      <div id="modal-loading">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+const TOKEN = 'ZFhLdzaCApsLldIroHBXsEsKtjLSKFNYTIKOhNEc';
+const HEADERS = {
+  'Authorization': `Discogs token=${TOKEN}`,
+  'User-Agent': 'CollectionBrowser/1.0'
+};
+
+let allRecords = [];
+let discogsUsername = '';
+let filteredRecords = [];
+let currentSort = 'random';
+const itunesCache = {}; // releaseId → url | null
+const reviewCache = {}; // releaseId → review text | null
+
+// ── Fetch helpers ─────────────────────────────────────────────────────────────
+
+async function discogsGet(url, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    const r = await fetch(url, { headers: HEADERS });
+    if (r.status === 429) {
+      // Rate limited — wait and retry
+      await new Promise(res => setTimeout(res, 2000 * (i + 1)));
+      continue;
+    }
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.json();
+  }
+  throw new Error('Rate limit exceeded after retries');
+}
+
+async function getUsername() {
+  const data = await discogsGet('https://api.discogs.com/oauth/identity');
+  return data.username;
+}
+
+async function fetchAllCollection(username) {
+  let page = 1, pages = 1;
+  const releases = [];
+  do {
+    setLoadingMsg(`Loading collection… (page ${page}${pages > 1 ? '/' + pages : ''})`);
+    const data = await discogsGet(
+      `https://api.discogs.com/users/${username}/collection/folders/0/releases?per_page=100&page=${page}&sort=added&sort_order=desc`
+    );
+    pages = data.pagination.pages;
+    releases.push(...data.releases);
+    page++;
+  } while (page <= pages);
+  return releases;
+}
+
+function setLoadingMsg(msg) {
+  document.getElementById('loading-msg').textContent = msg;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+async function init() {
+  try {
+    discogsUsername = await getUsername();
+    document.querySelector('h1').textContent = `${discogsUsername}'s Collection`;
+    const releases = await fetchAllCollection(discogsUsername);
+
+    const candidates = releases.map(r => {
+      const bi = r.basic_information;
+      return {
+        id: r.id,
+        releaseId: bi.id,
+        title: bi.title,
+        artist: bi.artists.map(a => a.name.replace(/\s*\(\d+\)$/, '')).join(', '),
+        year: bi.year || null,
+        genres: [...(bi.genres || []), ...(bi.styles || [])],
+        thumb: bi.thumb || '',
+        cover: bi.cover_image || bi.thumb || '',
+        formats: bi.formats ? bi.formats.map(f => f.name).join(', ') : '',
+        labels: bi.labels ? bi.labels.map(l => l.name).join(', ') : '',
+        notes: (r.notes || []).filter(n => n.field_id !== 1 && n.field_id !== 2).map(n => n.value).filter(Boolean).join('\n'),
+      };
+    });
+
+    // Load reviewed releases from pre-built reviews.json (GitHub Actions keeps this fresh)
+    setLoadingMsg('Loading reviews…');
+    let reviewedIds = {};
+    try {
+      const res = await fetch('https://raw.githubusercontent.com/andrewrlaw/bvrecs/main/reviews.json');
+      if (res.ok) {
+        const json = await res.json();
+        reviewedIds = json.reviews || {};
+      }
+    } catch {
+      // reviews.json not available — show all records as fallback
+    }
+
+    const hasReviews = Object.keys(reviewedIds).length > 0;
+
+    // Cache review text and filter to reviewed releases (or show all if no cache yet)
+    Object.entries(reviewedIds).forEach(([id, text]) => { reviewCache[id] = text; });
+    const reviewed = hasReviews
+      ? candidates.filter(r => reviewedIds.hasOwnProperty(String(r.releaseId)))
+      : candidates;
+
+    allRecords = reviewed;
+    shuffleArray(allRecords);
+
+    document.getElementById('loading').style.display = 'none';
+    applyFilters();
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      `<p style="color:#e06c6c">Failed to load collection: ${e.message}</p>
+       <p style="color:var(--muted);margin-top:8px;font-size:0.85rem">Check that your token is valid and try refreshing.</p>`;
+  }
+}
+
+// ── Art resolution: iTunes primary, Discogs fallback ─────────────────────────
+
+// Simple concurrency limiter — avoids hammering iTunes API
+function makePool(concurrency) {
+  let running = 0;
+  const queue = [];
+  return function run(fn) {
+    return new Promise((resolve, reject) => {
+      const execute = () => {
+        running++;
+        fn().then(resolve, reject).finally(() => {
+          running--;
+          if (queue.length) queue.shift()();
+        });
+      };
+      running < concurrency ? execute() : queue.push(execute);
+    });
+  };
+}
+const artPool = makePool(5);
+
+async function fetchItunesArt(releaseId, artist, title) {
+  if (releaseId in itunesCache) return itunesCache[releaseId];
+  return artPool(async () => {
+    try {
+      const q = encodeURIComponent(`${artist} ${title}`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&entity=album&limit=1&media=music`);
+      const data = await res.json();
+      const url = data.results?.[0]?.artworkUrl100?.replace('100x100bb', '600x600bb') || null;
+      itunesCache[releaseId] = url;
+      return url;
+    } catch {
+      itunesCache[releaseId] = null;
+      return null;
+    }
+  });
+}
+
+// Called from onerror on Discogs tile images
+window.itunesFallback = async function(img, releaseId, artist, title) {
+  img.onerror = null;
+  const url = await fetchItunesArt(releaseId, artist, title);
+  if (url) {
+    img.onload = null;
+    img.src = url;
+  } else {
+    img.outerHTML = '<div class="tile-placeholder">💿</div>';
+  }
+};
+
+async function resolveArt(img) {
+  const { releaseId, artist, title, discogs } = img.dataset;
+
+  // 1. Try iTunes
+  const itunesUrl = await fetchItunesArt(releaseId, artist, title);
+  if (itunesUrl) {
+    img.src = itunesUrl;
+    img.classList.remove('tile-needs-art');
+    return;
+  }
+
+  // 2. Fall back to Discogs
+  if (discogs) {
+    img.onerror = () => { img.onerror = null; img.outerHTML = '<div class="tile-placeholder">💿</div>'; };
+    img.src = discogs;
+    img.classList.remove('tile-needs-art');
+    return;
+  }
+
+  // 3. Give up
+  img.outerHTML = '<div class="tile-placeholder">💿</div>';
+}
+
+// ── Filtering & sorting ───────────────────────────────────────────────────────
+
+function applyFilters() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+
+  filteredRecords = allRecords.filter(r => {
+    return !q ||
+      r.title.toLowerCase().includes(q) ||
+      r.artist.toLowerCase().includes(q);
+  });
+
+  sortRecords();
+  renderGrid();
+}
+
+function sortRecords() {
+  switch (currentSort) {
+    case 'random': break; // already shuffled at load
+    case 'genre':
+      filteredRecords.sort((a, b) => (a.genres[0] || '').localeCompare(b.genres[0] || ''));
+      break;
+    case 'artist':
+      filteredRecords.sort((a, b) => a.artist.localeCompare(b.artist));
+      break;
+    case 'year_desc':
+      filteredRecords.sort((a, b) => (b.year || 0) - (a.year || 0));
+      break;
+    case 'year_asc':
+      filteredRecords.sort((a, b) => (a.year || 0) - (b.year || 0));
+      break;
+    case 'title':
+      filteredRecords.sort((a, b) => a.title.localeCompare(b.title));
+      break;
+  }
+}
+
+// ── Grid render ───────────────────────────────────────────────────────────────
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  const count = document.getElementById('record-count');
+
+
+  if (filteredRecords.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = '';
+  filteredRecords.forEach(r => {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.dataset.id = r.id;
+
+    const imgSrc = r.cover || r.thumb;
+    const fallbackAttr = `onerror="itunesFallback(this,'${r.releaseId}','${escAttr(r.artist)}','${escAttr(r.title)}')"`;
+
+    const imgHtml = imgSrc
+      ? `<img class="tile-img" src="${escHtml(imgSrc)}" loading="lazy" alt="${escHtml(r.title)}" ${fallbackAttr}>`
+      : `<img class="tile-img tile-needs-art" data-release-id="${r.releaseId}" data-artist="${escAttr(r.artist)}" data-title="${escAttr(r.title)}" alt="${escHtml(r.title)}">`;
+
+    tile.innerHTML = `
+      <div class="tile-inner">
+        <div class="tile-front">${imgHtml}</div>
+        <div class="tile-back">
+          <div class="tile-title">${escHtml(r.title)}</div>
+          <div class="tile-artist">${escHtml(r.artist)}</div>
+          ${r.year ? `<div class="tile-year">${r.year}</div>` : ''}
+        </div>
+      </div>`;
+
+    tile.addEventListener('click', () => openModal(r));
+    grid.appendChild(tile);
+  });
+
+  // Fetch iTunes art for tiles with no Discogs image
+  document.querySelectorAll('.tile-needs-art').forEach(async img => {
+    const { releaseId, artist, title } = img.dataset;
+    const url = await fetchItunesArt(releaseId, artist, title);
+    if (url) {
+      img.src = url;
+      img.classList.remove('tile-needs-art');
+    } else {
+      img.outerHTML = '<div class="tile-placeholder">💿</div>';
+    }
+  });
+}
+
+// ── Discogs reviews ───────────────────────────────────────────────────────────
+
+async function fetchMyReview(releaseId) {
+  if (releaseId in reviewCache) return reviewCache[releaseId];
+  try {
+    const data = await discogsGet(`https://api.discogs.com/releases/${releaseId}/reviews`);
+    const mine = (data.results || []).find(r => r.user?.username === discogsUsername);
+    reviewCache[releaseId] = mine?.review_plaintext || null;
+    return reviewCache[releaseId];
+  } catch {
+    reviewCache[releaseId] = null;
+    return null;
+  }
+}
+
+// ── Spotify ───────────────────────────────────────────────────────────────────
+
+const SPOTIFY_CLIENT_ID     = '7be95e0318204a429bd422dff740c2a1';
+const SPOTIFY_CLIENT_SECRET = 'b5b8d916977541b8beb9c618bc1a3b34';
+
+let spotifyToken = null;
+let spotifyTokenExpiry = 0;
+const spotifyCache = {};
+
+async function getSpotifyToken() {
+  if (spotifyToken && Date.now() < spotifyTokenExpiry) return spotifyToken;
+  const resp = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=client_credentials&client_id=${SPOTIFY_CLIENT_ID}&client_secret=${SPOTIFY_CLIENT_SECRET}`
+  });
+  const data = await resp.json();
+  spotifyToken = data.access_token;
+  spotifyTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  return spotifyToken;
+}
+
+async function searchSpotifyAlbum(artist, title) {
+  const key = `${artist}::${title}`;
+  if (key in spotifyCache) return spotifyCache[key];
+  try {
+    const token = await getSpotifyToken();
+    const q = encodeURIComponent(`album:${title} artist:${artist}`);
+    const resp = await fetch(
+      `https://api.spotify.com/v1/search?q=${q}&type=album&limit=1`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    const data = await resp.json();
+    const album = data.albums?.items?.[0];
+    if (!album) { spotifyCache[key] = null; return null; }
+    spotifyCache[key] = { id: album.id, url: album.external_urls.spotify };
+    return spotifyCache[key];
+  } catch {
+    spotifyCache[key] = null;
+    return null;
+  }
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+async function openModal(record) {
+  const overlay = document.getElementById('modal-overlay');
+  const body = document.getElementById('modal-body');
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Show skeleton while loading
+  const imgEl = record.cover
+    ? `<img id="modal-cover" src="${escHtml(record.cover)}" alt="${escHtml(record.title)}" onerror="this.outerHTML='<div id=modal-cover-placeholder>💿</div>'">`
+    : `<div id="modal-cover-placeholder">💿</div>`;
+
+  const chips = [
+    record.year ? `<span class="meta-chip">${record.year}</span>` : '',
+    record.labels ? `<span class="meta-chip">${escHtml(record.labels)}</span>` : '',
+    record.genres.length ? '<div style="width:100%;height:0"></div><span style="font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:#999;align-self:center">Genres</span>' : '',
+    ...record.genres.map(g => `<span class="meta-chip genre">${escHtml(g)}</span>`)
+  ].filter(Boolean).join('');
+
+  body.innerHTML = `
+    ${imgEl}
+    <div id="modal-details">
+      <div id="modal-title">${escHtml(record.title)}</div>
+      <div id="modal-artist">${escHtml(record.artist)}</div>
+      <div class="modal-meta">${chips}</div>
+      ${record.notes ? `<div id="modal-notes">${escHtml(record.notes)}</div>` : ''}
+      <div id="modal-review-wrap"></div>
+      <div id="modal-tracklist"><div class="spinner" style="width:24px;height:24px;margin:0 0 8px"></div> Loading tracklist…</div>
+      <div id="modal-links">
+        <a class="modal-link" href="https://www.discogs.com/release/${record.releaseId}" target="_blank" rel="noopener">View on Discogs ↗</a>
+      </div>
+    </div>`;
+
+  // Fetch tracklist, Spotify, and review in parallel
+  const [, spotifyResult, reviewResult] = await Promise.allSettled([
+    (async () => {
+      try {
+        const data = await discogsGet(`https://api.discogs.com/releases/${record.releaseId}`);
+        const tracklistEl = document.getElementById('modal-tracklist');
+        if (!tracklistEl) return;
+        if (data.tracklist && data.tracklist.length) {
+          const rows = data.tracklist.map(t =>
+            `<div class="track-row">
+              <span class="track-pos">${escHtml(t.position || '–')}</span>
+              <span class="track-title">${escHtml(t.title)}</span>
+              ${t.duration ? `<span class="track-duration">${escHtml(t.duration)}</span>` : ''}
+            </div>`
+          ).join('');
+          tracklistEl.innerHTML = `<details><summary>Tracklist</summary>${rows}</details>`;
+        } else {
+          tracklistEl.innerHTML = '';
+        }
+      } catch {
+        const tl = document.getElementById('modal-tracklist');
+        if (tl) tl.innerHTML = '';
+      }
+    })(),
+    searchSpotifyAlbum(record.artist, record.title),
+    fetchMyReview(record.releaseId)
+  ]);
+
+  // Inject review if found
+  const review = reviewResult.value;
+  if (review) {
+    const wrap = document.getElementById('modal-review-wrap');
+    if (wrap) wrap.innerHTML =
+      `<div id="modal-review-label">My Review</div><div id="modal-review">${escHtml(review)}</div>`;
+  }
+
+  // Inject Spotify player + link if found
+  const spotify = spotifyResult.value;
+  if (spotify) {
+    const linksEl = document.getElementById('modal-links');
+    if (linksEl) {
+      linksEl.insertAdjacentHTML('beforeend',
+        `<a class="modal-link" href="${escHtml(spotify.url)}" target="_blank" rel="noopener">Listen on Spotify ↗</a>`);
+    }
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.getElementById('modal-body').innerHTML = '';
+  document.body.style.overflow = '';
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// For values injected into inline event handler attribute strings (single-quoted context)
+function escAttr(str) {
+  if (!str) return '';
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+
+document.getElementById('search').addEventListener('input', applyFilters);
+
+document.getElementById('sort').addEventListener('change', e => {
+  currentSort = e.target.value;
+  if (currentSort === 'random') shuffleArray(filteredRecords);
+  else sortRecords();
+  renderGrid();
+});
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ── Go ────────────────────────────────────────────────────────────────────────
+
+init();
+</script>
+</body>
+</html>
