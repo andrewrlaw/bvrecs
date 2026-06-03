@@ -33,6 +33,9 @@ jobs:
           git fetch origin
           git rebase origin/main
           git add reviews.json
-          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
           git commit -m "chore: sync reviews [$(date -u +%Y-%m-%d)]"
-          git push
+          git push origin main
